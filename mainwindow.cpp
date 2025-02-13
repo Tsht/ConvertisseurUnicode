@@ -222,33 +222,51 @@ QString MainWindow::convertString(const QString &input,
 }
 
 QString MainWindow::processRepeatingTemplate(const QString &tpl,
-                                             const QString &original,
-                                             const QString &converted)
+                                               const QString &original,
+                                               const QString &converted)
 {
-    QRegularExpression regex(R"((\\)?(\$[12]))");
     QString result;
     int pos = 0;
-    QRegularExpressionMatch match;
-    auto it = regex.globalMatch(tpl);
-    while (it.hasNext()) {
-        match = it.next();
-        int start = match.capturedStart();
-        int end = match.capturedEnd();
-        result.append(tpl.mid(pos, start - pos));
-        if (match.captured(1).isEmpty()) {
-            QString placeholder = match.captured(2);
-            if (placeholder == "$1")
-                result.append(original);
-            else if (placeholder == "$2")
-                result.append(converted);
-        } else {
-            result.append(match.captured(2));
+    while (pos < tpl.size()) {
+        int index = tpl.indexOf('$', pos);
+        if (index == -1) {
+            result.append(tpl.mid(pos));
+            break;
         }
-        pos = end;
+        // Compter le nombre de backslashes consécutifs qui précèdent le '$'
+        int bsCount = 0;
+        int j = index - 1;
+        while (j >= pos && tpl[j] == '\\') {
+            bsCount++;
+            j--;
+        }
+        // Ajouter le texte précédent, en retirant les backslashes utilisés pour l'échappement
+        result.append(tpl.mid(pos, index - pos - bsCount));
+        // Afficher (bsCount/2) backslashes dans la sortie
+        int outputBackslashes = bsCount / 2;
+        result.append(QString(outputBackslashes, '\\'));
+        // Si le nombre de backslashes est impair, le '$' est échappé
+        bool isEscaped = (bsCount % 2 == 1);
+        // On récupère le placeholder "$1" ou "$2"
+        QString placeholder = tpl.mid(index, 2);
+        if (placeholder == "$1" || placeholder == "$2") {
+            if (isEscaped) {
+                // Si échappé, afficher littéralement le placeholder
+                result.append(placeholder);
+            } else {
+                // Sinon, effectuer la substitution
+                result.append(placeholder == "$1" ? original : converted);
+            }
+            pos = index + 2;
+        } else {
+            // Si ce n'est pas un placeholder reconnu, on ajoute simplement '$'
+            result.append("$");
+            pos = index + 1;
+        }
     }
-    result.append(tpl.mid(pos));
     return result;
 }
+
 
 QString MainWindow::processGlobalTemplate(const QString &tpl)
 {
